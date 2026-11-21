@@ -15,9 +15,7 @@
         unidades: []
     };
 
-    const API_BASE =
-        window.APP_CONFIG?.API_BASE_URL ||
-        'http://localhost:7070';
+    const API_BASE = window.APP_CONFIG.API_BASE_URL;
 
     const API_PROD = `${API_BASE}/api/productos`;
     const API_UNIDADES = `${API_PROD}/unidades`;

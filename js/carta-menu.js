@@ -8,9 +8,7 @@
         productos: []
     };
 
-    const API_BASE = window.APP_CONFIG?.API_BASE_URL
-        ? String(window.APP_CONFIG.API_BASE_URL).replace(/\/+$/, '')
-        : 'http://localhost:7070';
+    const API_BASE = String(window.APP_CONFIG.API_BASE_URL).replace(/\/+$/, '');
 
     const API_CARTA = `${API_BASE}/api/reportes/carta`;
 

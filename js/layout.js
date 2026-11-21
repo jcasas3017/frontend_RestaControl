@@ -710,9 +710,8 @@ const Layout = (() => {
                     Actualizando...
                 `;
 
-                const apiBase = (
-                    window.APP_CONFIG?.API_BASE_URL
-                    || 'http://localhost:7070'
+                const apiBase = String(
+                    window.APP_CONFIG.API_BASE_URL
                 ).replace(/\/+$/, '');
 
                 const response = await fetch(
