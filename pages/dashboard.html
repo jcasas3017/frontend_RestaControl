@@ -64,6 +64,13 @@
         </div>
 
         <!-- STATS GRID -->
+        <div class="alert alert-danger d-none" id="dashError" role="alert">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+                <span><i class="bi bi-exclamation-triangle-fill me-2"></i><span id="dashErrorMessage">No se pudo cargar el dashboard.</span></span>
+                <button type="button" class="btn btn-sm btn-outline-danger" id="btnReintentarDashboard"><i class="bi bi-arrow-clockwise me-1"></i>Reintentar</button>
+            </div>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon si-orange"><i class="bi bi-tags"></i></div>
