@@ -21,7 +21,7 @@
         deletingReserva: null
     };
 
-    const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || 'http://localhost:7070';
+    const API_BASE = window.APP_CONFIG.API_BASE_URL;
     const API_RESERVAS = `${API_BASE}/api/reservas`;
     const API_LISTA_MESAS = `${API_BASE}/api/lista-mesas`;
     const API_ESTADOS = `${API_RESERVAS}/estados`;

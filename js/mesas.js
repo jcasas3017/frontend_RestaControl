@@ -16,7 +16,7 @@
         deletingMesa: null
     };
 
-    const API_BASE = (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || 'http://localhost:7070';
+    const API_BASE = window.APP_CONFIG.API_BASE_URL;
     const API_MESAS = `${API_BASE}/api/mesas`;
     const API_ESTADOS = `${API_MESAS}/estados`;
     const API_NEXT_CODIGO = `${API_MESAS}/next-codigo`;

@@ -36,8 +36,10 @@ const Layout = (() => {
         mesas: ['ADMINISTRADOR', 'RECEPCION'],
         reservas: ['ADMINISTRADOR', 'RECEPCION'],
 
-        // Atención y pedidos
+        // Atención y pedidos (coincide con las reglas de SecurityConfig del backend)
         listaMesas: ['ADMINISTRADOR', 'MOZO'],
+        atenciones: ['ADMINISTRADOR', 'MOZO'],
+        pedidos: ['ADMINISTRADOR', 'MOZO'],
         pedidosMesa: ['ADMINISTRADOR', 'MOZO'],
         detallePedidos: [
             'ADMINISTRADOR',
@@ -169,6 +171,39 @@ const Layout = (() => {
             >
                 <i class="bi bi-grid"></i>
                 <span>Lista-Mesas</span>
+            </a>
+        </li>
+
+        <li>
+            <a
+                class="nav-link"
+                href="atenciones.html"
+                data-page="atenciones"
+            >
+                <i class="bi bi-bell"></i>
+                <span>Atenciones</span>
+            </a>
+        </li>
+
+        <li>
+            <a
+                class="nav-link"
+                href="pedidos.html"
+                data-page="pedidos"
+            >
+                <i class="bi bi-receipt"></i>
+                <span>Pedidos</span>
+            </a>
+        </li>
+
+        <li>
+            <a
+                class="nav-link"
+                href="detalle-pedidos.html"
+                data-page="detallePedidos"
+            >
+                <i class="bi bi-list-check"></i>
+                <span>Detalle de pedidos</span>
             </a>
         </li>
 
@@ -710,9 +745,8 @@ const Layout = (() => {
                     Actualizando...
                 `;
 
-                const apiBase = (
-                    window.APP_CONFIG?.API_BASE_URL
-                    || 'http://localhost:7070'
+                const apiBase = String(
+                    window.APP_CONFIG.API_BASE_URL
                 ).replace(/\/+$/, '');
 
                 const response = await fetch(

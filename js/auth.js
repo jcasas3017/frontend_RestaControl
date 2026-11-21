@@ -1,10 +1,6 @@
 ﻿const Auth = (() => {
     const SESSION_KEY = 'rc_sess';
 
-    window.APP_CONFIG = window.APP_CONFIG || {
-        API_BASE_URL: 'http://localhost:7070'
-    };
-
     const API_BASE_URL = window.APP_CONFIG.API_BASE_URL;
     const LOGIN_URL = `${API_BASE_URL}/api/auth/login`;
     const ME_URL = `${API_BASE_URL}/api/auth/me`;
