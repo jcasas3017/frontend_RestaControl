@@ -1,12 +1,11 @@
 /* =====================================================
    RestaControl — Dashboard Page Logic
-   Carga métricas desde la base de datos local y opcionalmente desde backend API.
+   Carga las métricas reales desde el backend (GET /api/dashboard).
    ===================================================== */
 
 (() => {
-    const apiBaseUrl = window.APP_CONFIG?.API_BASE_URL
-        ? String(window.APP_CONFIG.API_BASE_URL).replace(/\/+$/, '')
-        : null;
+    const API_BASE = String(window.APP_CONFIG?.API_BASE_URL ?? '').replace(/\/+$/, '');
+    const REQUEST_TIMEOUT_MS = 10000;
 
     async function init() {
         const authenticated = await Auth.requireLogin();
@@ -15,181 +14,86 @@
             return;
         }
 
+        byId('btnReintentarDashboard')?.addEventListener('click', render);
+
         await render();
     }
 
     async function render() {
+        hideError();
+        setLoading(true);
+
         try {
-            const data = await loadDashboardData();
+            const data = await fetchDashboardFromApi();
 
             renderStats(data);
             renderReservas(data.reservas?.rows || []);
             renderAtenciones(data.atenciones?.rows || []);
         } catch (error) {
-            console.error(
-                'No se pudo renderizar el dashboard:',
-                error
-            );
+            console.error('No se pudo cargar el dashboard:', error);
+            clearTables();
+            showError(error.message);
         }
-    }
-
-    async function loadDashboardData() {
-        const dashboardFromApi = await fetchDashboardFromApi();
-
-        if (!dashboardFromApi) {
-            throw new Error(
-                'No se pudieron cargar los datos del dashboard desde el backend.'
-            );
-        }
-
-        return dashboardFromApi;
     }
 
     async function fetchDashboardFromApi() {
-        if (!apiBaseUrl) {
-            return null;
-        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+        let response;
         try {
-            const response = await fetch(
-                `${apiBaseUrl}/api/dashboard`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Accept: 'application/json'
-                    },
-                    credentials: 'include'
-                }
-            );
-
-            const payload = await response.json();
-
-            if (!response.ok) {
-                console.error(
-                    'Error consultando dashboard:',
-                    response.status,
-                    payload
-                );
-                return null;
-            }
-
-            const dashboardData = payload?.data ?? payload;
-
-            if (!dashboardData || typeof dashboardData !== 'object') {
-                console.warn(
-                    'Respuesta de dashboard backend inválida.',
-                    payload
-                );
-                return null;
-            }
-
-            console.log(
-                'Datos recibidos del dashboard:',
-                dashboardData
-            );
-
-            return dashboardData;
-
+            response = await fetch(`${API_BASE}/api/dashboard`, {
+                method: 'GET',
+                headers: { Accept: 'application/json' },
+                credentials: 'include',
+                signal: controller.signal
+            });
         } catch (error) {
-            console.error(
-                'Error cargando dashboard desde backend:',
-                error
-            );
-            return null;
+            throw new Error(error.name === 'AbortError'
+                ? 'El backend tardó demasiado en responder.'
+                : 'No se pudo conectar con el backend.');
+        } finally {
+            clearTimeout(timer);
         }
+
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(payload?.message || `El backend respondió con error ${response.status}.`);
+        }
+
+        const data = payload?.data ?? payload;
+        if (!data || typeof data !== 'object') {
+            throw new Error('La respuesta del backend no tiene el formato esperado.');
+        }
+
+        return data;
     }
 
-    function loadDashboardDataFromLocalDb() {
-
-        const reservas = DB.getAll('reservas');
-        const atenciones = DB.getAll('atenciones');
-        const pedidos = DB.getAll('pedidos');
-        const detalles = DB.getAll('detallePedidos');
-        const usuarios = DB.getAll('usuarios');
-
-        const reservasActivas = reservas.filter((reserva) => String(reserva.estado || '').toLowerCase() !== 'cancelada');
-        const reservasConfirmadas = reservasActivas.filter((reserva) => String(reserva.estado || '').toLowerCase() === 'confirmada');
-        const atencionesEnCurso = atenciones.filter((atencion) => String(atencion.estado || '').toLowerCase() === 'en curso');
-        const cerradasHoy = atenciones.filter((atencion) => {
-            if (String(atencion.estado || '').toLowerCase() !== 'cerrada') return false;
-            if (!atencion.cierre_en) return false;
-            const cierre = new Date(atencion.cierre_en);
-            const hoy = new Date();
-            return cierre.getFullYear() === hoy.getFullYear()
-                && cierre.getMonth() === hoy.getMonth()
-                && cierre.getDate() === hoy.getDate();
-        });
-
-        const reservasRows = reservasActivas
-            .slice()
-            .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))
-            .slice(0, 5)
-            .map((reserva, index) => ({
-                index: index + 1,
-                cliente: reserva.nombre_contacto || `Cliente ${reserva.id_cliente || ''}`,
-                mesa: getMesaCodigo(reserva.id_mesa),
-                fechaHora: formatDateTime(reserva.fecha_hora),
-                personas: reserva.cantidad_personas || 0,
-                estado: reserva.estado || 'Pendiente'
-            }));
-
-        const atencionesRows = atenciones
-            .slice()
-            .sort((a, b) => sortAtencionRows(a, b))
-            .slice(0, 5)
-            .map((atencion, index) => ({
-                index: index + 1,
-                cliente: getClienteNombre(atencion.id_cliente),
-                mesa: getMesaCodigo(atencion.id_mesa),
-                mozo: getUsuarioNombre(atencion.id_mozo),
-                estado: atencion.estado || 'Desconocido',
-                pago: atencion.estado_pago || 'Pendiente'
-            }));
-
-        return {
-            categorias: {
-                active: categorias.filter((categoria) => Boolean(categoria.activo)).length,
-                total: categorias.length
-            },
-            platos: {
-                available: platos.filter((plato) => plato.activo && plato.disponible !== false).length,
-                total: platos.length
-            },
-            mesas: {
-                active: mesas.filter((mesa) => Boolean(mesa.activa)).length,
-                total: mesas.length
-            },
-            reservas: {
-                active: reservasActivas.length,
-                confirmed: reservasConfirmadas.length,
-                rows: reservasRows
-            },
-            atenciones: {
-                inProgress: atencionesEnCurso.length,
-                closedToday: cerradasHoy.length,
-                rows: atencionesRows
-            },
-            pedidos: {
-                total: pedidos.length,
-                items: detalles.length
-            }
-        };
+    function setLoading(loading) {
+        if (!loading) return;
+        const row = '<tr><td colspan="6" class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2"></div>Cargando...</td></tr>';
+        const reservas = byId('dashReservasBody');
+        const atenciones = byId('dashAtencionesBody');
+        if (reservas) reservas.innerHTML = row;
+        if (atenciones) atenciones.innerHTML = row;
     }
 
-    function sortAtencionRows(a, b) {
-        const estadoPri = getAtencionPriority(a.estado);
-        const estadoSec = getAtencionPriority(b.estado);
-        if (estadoPri !== estadoSec) return estadoPri - estadoSec;
-        const fechaA = new Date(a.apertura_en || '');
-        const fechaB = new Date(b.apertura_en || '');
-        return fechaA - fechaB;
+    function clearTables() {
+        const row = '<tr><td colspan="6" class="text-center text-muted py-4">Sin datos disponibles.</td></tr>';
+        const reservas = byId('dashReservasBody');
+        const atenciones = byId('dashAtencionesBody');
+        if (reservas) reservas.innerHTML = row;
+        if (atenciones) atenciones.innerHTML = row;
     }
 
-    function getAtencionPriority(estado) {
-        const raw = String(estado || '').toLowerCase();
-        if (raw.includes('en curso')) return 0;
-        if (raw.includes('cerrada')) return 1;
-        return 2;
+    function showError(message) {
+        setText('dashErrorMessage', message || 'No se pudo cargar el dashboard.');
+        byId('dashError')?.classList.remove('d-none');
+    }
+
+    function hideError() {
+        byId('dashError')?.classList.add('d-none');
     }
 
     function renderStats(data) {
@@ -276,27 +180,6 @@
         return `<span class="badge-pill ${klass}">${escapeHtml(label)}</span>`;
     }
 
-    function getMesaCodigo(idMesa) {
-        const mesa = DB.getById('mesas', idMesa);
-        return mesa ? mesa.codigo : `Mesa ${idMesa || '-'} `;
-    }
-
-    function getClienteNombre(idCliente) {
-        const cliente = DB.getById('clientes', idCliente);
-        if (!cliente) return `Cliente ${idCliente || ''}`;
-        return `${cliente.nombres || ''} ${cliente.apellidos || ''}`.trim();
-    }
-
-    function getUsuarioNombre(idUsuario) {
-        const usuario = DB.getById('usuarios', idUsuario);
-        if (!usuario) return `Usuario ${idUsuario || ''}`;
-        return `${usuario.nombres || ''} ${usuario.apellidos || ''}`.trim();
-    }
-
-    function apiAvailable() {
-        return Boolean(apiBaseUrl);
-    }
-
     function escapeHtml(value) {
         if (value === null || value === undefined) return '';
         return String(value)
@@ -305,16 +188,6 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;');
-    }
-
-    function formatDateTime(isoValue) {
-        if (!isoValue) return '-';
-        const date = new Date(isoValue);
-        if (Number.isNaN(date.getTime())) return String(isoValue);
-        return date.toLocaleString('es-PE', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-        });
     }
 
     function byId(id) {
